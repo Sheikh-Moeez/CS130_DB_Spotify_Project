@@ -1,0 +1,22 @@
+{
+    "java.home": "C:/Java/jdk-24",
+    "java.project.referencedLibraries": [
+      "D:/Softwares/openjfx-24.0.1_windows-x64_bin-sdk/javafx-sdk-24.0.1/lib/*"
+    ],
+    "java.configuration.runtimes": [
+      {
+        "name": "JavaSE-24",
+        "path": "C:/Java/jdk-24",
+        "default": true
+      }
+    ],
+    "java.run.arguments": [
+      "--module-path",
+      "D:/Softwares/openjfx-24.0.1_windows-x64_bin-sdk/javafx-sdk-24.0.1/lib",
+      "--add-modules",
+      "javafx.controls,javafx.fxml"
+    ],
+    "java.autobuild.enabled": true,
+    "java.configuration.debug.enabled": true
+  }
+  
