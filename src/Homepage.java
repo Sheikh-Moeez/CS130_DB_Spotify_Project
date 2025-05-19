@@ -16,6 +16,58 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+// Song data class to hold song information
+class Song {
+    private String id;
+    private String title;
+    private int duration;
+    private String releaseDate;
+    private String audioFile;
+    private String coverImage;
+    private String artistId;
+    private String albumId;
+    private String genreId;
+    private String languageId;
+
+    public Song(String id, String title, int duration, String releaseDate,
+                String audioFile, String coverImage, String artistId,
+                String albumId, String genreId, String languageId) {
+        this.id = id;
+        this.title = title;
+        this.duration = duration;
+        this.releaseDate = releaseDate;
+        this.audioFile = audioFile;
+        this.coverImage = coverImage;
+        this.artistId = artistId;
+        this.albumId = albumId;
+        this.genreId = genreId;
+        this.languageId = languageId;
+    }
+
+    // Getters
+    public String getId() { return id; }
+    public String getTitle() { return title; }
+    public int getDuration() { return duration; }
+    public String getReleaseDate() { return releaseDate; }
+    public String getAudioFile() { return audioFile; }
+    public String getCoverImage() { return coverImage; }
+    public String getArtistId() { return artistId; }
+    public String getAlbumId() { return albumId; }
+    public String getGenreId() { return genreId; }
+    public String getLanguageId() { return languageId; }
+
+    // Helper method to format duration from seconds to mm:ss
+    public String getFormattedDuration() {
+        int minutes = duration / 60;
+        int seconds = duration % 60;
+        return String.format("%d:%02d", minutes, seconds);
+    }
+}
 
 public class Homepage
 {
@@ -107,6 +159,247 @@ public class Homepage
         }
     }
 
+    // Method to fetch songs from database
+    private List<Song> fetchSongsFromDatabase() {
+        List<Song> songs = new ArrayList<>();
+        Connection conn = connectToDB();
+
+        if (conn == null) {
+            System.out.println("Database connection failed, no songs to display");
+            return songs;
+        }
+
+        try {
+            String songSql = "SELECT id, title, duration, releaseDate, audioFile, coverImage, " +
+                    "artistId, albumId, genreId, languageId FROM Songs ORDER BY releaseDate DESC";
+            PreparedStatement stmt = conn.prepareStatement(songSql);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                Song song = new Song(
+                        rs.getString("id"),
+                        rs.getString("title"),
+                        rs.getInt("duration"),
+                        rs.getString("releaseDate"),
+                        rs.getString("audioFile"),
+                        rs.getString("coverImage"),
+                        rs.getString("artistId"),
+                        rs.getString("albumId"),
+                        rs.getString("genreId"),
+                        rs.getString("languageId")
+                );
+                songs.add(song);
+            }
+
+            rs.close();
+            stmt.close();
+            conn.close();
+
+            System.out.println("Fetched " + songs.size() + " songs from database");
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.out.println("Error fetching songs: " + e.getMessage());
+        }
+
+        return songs;
+    }
+
+    // Method to get artist name by artist ID
+    private String getArtistNameById(String artistId) {
+        Connection conn = connectToDB();
+        if (conn == null) return "Unknown Artist";
+
+        try {
+            String sql = "SELECT u.username FROM Artists a JOIN Users u ON a.userId = u.id WHERE a.id = ?";
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            stmt.setString(1, artistId);
+            ResultSet rs = stmt.executeQuery();
+
+            String artistName = "Unknown Artist";
+            if (rs.next()) {
+                artistName = rs.getString("username");
+            }
+
+            rs.close();
+            stmt.close();
+            conn.close();
+            return artistName;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "Unknown Artist";
+        }
+    }
+
+    // Method to create a song row UI component (list style)
+    private HBox createSongRow(Song song, int index) {
+        HBox songRow = new HBox(15);
+        songRow.setStyle("-fx-background-color: transparent; -fx-padding: 8 20 8 20;");
+        songRow.setAlignment(Pos.CENTER_LEFT);
+        songRow.setPrefHeight(64);
+        songRow.setCursor(javafx.scene.Cursor.HAND);
+
+        // Add hover effect
+        songRow.setOnMouseEntered(e ->
+                songRow.setStyle("-fx-background-color: #1a1a1a; -fx-padding: 8 20 8 20;"));
+        songRow.setOnMouseExited(e ->
+                songRow.setStyle("-fx-background-color: transparent; -fx-padding: 8 20 8 20;"));
+
+        // Index/Number
+        Label indexLabel = new Label(String.valueOf(index));
+        indexLabel.setTextFill(Color.web("#b3b3b3"));
+        indexLabel.setFont(Font.font("System", FontWeight.NORMAL, 16));
+        indexLabel.setPrefWidth(30);
+        indexLabel.setAlignment(Pos.CENTER);
+
+        // Cover image (smaller for list view)
+        ImageView coverImageView = createCoverImage(song.getCoverImage(), 48, 48);
+        coverImageView.setStyle("-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 5, 0, 0, 0);");
+
+        // Song info container (title and artist)
+        VBox songInfo = new VBox(2);
+        songInfo.setAlignment(Pos.CENTER_LEFT);
+
+        // Song title
+        Label titleLabel = new Label(song.getTitle());
+        titleLabel.setTextFill(Color.WHITE);
+        titleLabel.setFont(Font.font("System", FontWeight.NORMAL, 16));
+
+        // Artist name
+        String artistName = getArtistNameById(song.getArtistId());
+        Label artistLabel = new Label(artistName);
+        artistLabel.setTextFill(Color.web("#b3b3b3"));
+        artistLabel.setFont(Font.font("System", FontWeight.NORMAL, 14));
+
+        songInfo.getChildren().addAll(titleLabel, artistLabel);
+
+        // Song title (center column)
+        Label songTitleCenter = new Label(song.getTitle());
+        songTitleCenter.setTextFill(Color.WHITE);
+        songTitleCenter.setFont(Font.font("System", FontWeight.NORMAL, 16));
+
+        // Release date
+        Label releaseDateLabel = new Label(formatReleaseDate(song.getReleaseDate()));
+        releaseDateLabel.setTextFill(Color.web("#b3b3b3"));
+        releaseDateLabel.setFont(Font.font("System", FontWeight.NORMAL, 14));
+
+        // Duration
+        Label durationLabel = new Label(song.getFormattedDuration());
+        durationLabel.setTextFill(Color.web("#b3b3b3"));
+        durationLabel.setFont(Font.font("System", FontWeight.NORMAL, 14));
+        durationLabel.setPrefWidth(60);
+        durationLabel.setAlignment(Pos.CENTER_RIGHT);
+
+        // Spacers for proper column alignment
+        Region spacer1 = new Region();
+        HBox.setHgrow(spacer1, Priority.ALWAYS);
+
+        Region spacer2 = new Region();
+        HBox.setHgrow(spacer2, Priority.ALWAYS);
+
+        // Add click handler for song playback
+        songRow.setOnMouseClicked(e -> playSong(song));
+
+        songRow.getChildren().addAll(
+                indexLabel,
+                coverImageView,
+                songInfo,
+                spacer1,
+                songTitleCenter,
+                spacer2,
+                releaseDateLabel,
+                durationLabel
+        );
+
+        return songRow;
+    }
+
+    // Helper method to format release date
+    private String formatReleaseDate(String releaseDate) {
+        if (releaseDate == null || releaseDate.trim().isEmpty()) {
+            return "Unknown";
+        }
+        try {
+            // Assuming date format is YYYY-MM-DD, extract month and year
+            String[] parts = releaseDate.split("-");
+            if (parts.length >= 2) {
+                String year = parts[0];
+                String month = parts[1];
+
+                String[] monthNames = {"", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+                int monthInt = Integer.parseInt(month);
+                if (monthInt >= 1 && monthInt <= 12) {
+                    return monthNames[monthInt] + " " + parts[2] + ", " + year;
+                }
+            }
+            return releaseDate;
+        } catch (Exception e) {
+            return releaseDate;
+        }
+    }
+
+    // Method to create cover image with error handling
+    private ImageView createCoverImage(String imagePath, int width, int height) {
+        ImageView imageView = new ImageView();
+        imageView.setFitWidth(width);
+        imageView.setFitHeight(height);
+        imageView.setPreserveRatio(true);
+        imageView.setSmooth(true);
+
+        if (imagePath != null && !imagePath.trim().isEmpty()) {
+            try {
+                // Try to load the image from file path
+                File imageFile = new File(imagePath);
+                if (imageFile.exists()) {
+                    FileInputStream fis = new FileInputStream(imageFile);
+                    Image image = new Image(fis);
+                    imageView.setImage(image);
+                    fis.close();
+                } else {
+                    // If file doesn't exist, try loading from resources
+                    try {
+                        Image image = new Image(getClass().getResourceAsStream(imagePath));
+                        imageView.setImage(image);
+                    } catch (Exception ex) {
+                        // Use default cover if image not found
+                        setDefaultCoverImage(imageView);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Could not load cover image: " + imagePath + " - " + e.getMessage());
+                setDefaultCoverImage(imageView);
+            }
+        } else {
+            setDefaultCoverImage(imageView);
+        }
+
+        return imageView;
+    }
+
+    // Set a default cover image or create a placeholder
+    private void setDefaultCoverImage(ImageView imageView) {
+        // Create a simple colored rectangle as placeholder
+        imageView.setStyle("-fx-background-color: #404040;");
+        // You could also try to load a default image from resources here
+        try {
+            Image defaultImage = new Image(getClass().getResourceAsStream("/Icons/default_cover.png"));
+            imageView.setImage(defaultImage);
+        } catch (Exception e) {
+            // If no default image available, the styled background will show
+            System.out.println("No default cover image available");
+        }
+    }
+
+    // Method to handle song playback (placeholder for now)
+    private void playSong(Song song) {
+        System.out.println("Playing song: " + song.getTitle() + " (" + song.getAudioFile() + ")");
+        // TODO: Implement actual audio playback functionality
+        // You could use JavaFX MediaPlayer here to play the audio file
+    }
+
     public void showHomepage() {
         System.out.println("Showing homepage for user: " + username + " (Type: " + userType + ")");
 
@@ -156,48 +449,111 @@ public class Homepage
         librarySidebar.getChildren().add(libraryTitle);
 
         // === Center Content ===
-        VBox centerContent = new VBox();
-        centerContent.setPadding(new Insets(15));
-        centerContent.setStyle("-fx-background-color: #202020;");
+        VBox centerContent = new VBox(20);
+        centerContent.setPadding(new Insets(20));
+        centerContent.setStyle("-fx-background-color: #121212;");
         BorderPane.setMargin(centerContent, new Insets(5, 0, 0, 7));
 
         // Welcome message with user's name and type
         Label welcomeLabel = new Label("Welcome back, " + username);
         welcomeLabel.setTextFill(Color.WHITE);
-        welcomeLabel.setFont(new Font(24));
+        welcomeLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
 
-        Label playlistsLabel = new Label("Playlists");
-        playlistsLabel.setTextFill(Color.WHITE);
-        playlistsLabel.setFont(new Font(18));
+        // Songs section
+        Label songsLabel = new Label("Recently Added Songs");
+        songsLabel.setTextFill(Color.WHITE);
+        songsLabel.setFont(Font.font("System", FontWeight.BOLD, 22));
 
-        HBox playlistsRow = new HBox(10);
-        playlistsRow.setPadding(new Insets(10));
-        for (int i = 1; i <= 5; i++) {
-            VBox playlist = new VBox(5);
-            playlist.setStyle("-fx-background-color: #333333; -fx-padding: 10;");
-            Label pLabel = new Label("Playlist " + i);
-            pLabel.setTextFill(Color.WHITE);
-            playlist.getChildren().add(pLabel);
-            playlistsRow.getChildren().add(playlist);
+        // Fetch songs from database
+        List<Song> songs = fetchSongsFromDatabase();
+
+        // Create songs table header
+        HBox tableHeader = new HBox(15);
+        tableHeader.setStyle("-fx-background-color: transparent; -fx-padding: 8 20 8 20; -fx-border-color: #333; -fx-border-width: 0 0 1 0;");
+        tableHeader.setAlignment(Pos.CENTER_LEFT);
+        tableHeader.setPrefHeight(40);
+
+        Label headerIndex = new Label("#");
+        headerIndex.setTextFill(Color.web("#b3b3b3"));
+        headerIndex.setFont(Font.font("System", FontWeight.BOLD, 14));
+        headerIndex.setPrefWidth(30);
+        headerIndex.setAlignment(Pos.CENTER);
+
+        Label headerTitle = new Label("Title");
+        headerTitle.setTextFill(Color.web("#b3b3b3"));
+        headerTitle.setFont(Font.font("System", FontWeight.BOLD, 14));
+        headerTitle.setPrefWidth(300);
+
+        Label headerAlbum = new Label("Album");
+        headerAlbum.setTextFill(Color.web("#b3b3b3"));
+        headerAlbum.setFont(Font.font("System", FontWeight.BOLD, 14));
+
+        Label headerDate = new Label("Date added");
+        headerDate.setTextFill(Color.web("#b3b3b3"));
+        headerDate.setFont(Font.font("System", FontWeight.BOLD, 14));
+
+        Label headerDuration = new Label("⏱");
+        headerDuration.setTextFill(Color.web("#b3b3b3"));
+        headerDuration.setFont(Font.font("System", FontWeight.BOLD, 14));
+        headerDuration.setPrefWidth(60);
+        headerDuration.setAlignment(Pos.CENTER_RIGHT);
+
+        Region headerSpacer1 = new Region();
+        HBox.setHgrow(headerSpacer1, Priority.ALWAYS);
+
+        Region headerSpacer2 = new Region();
+        HBox.setHgrow(headerSpacer2, Priority.ALWAYS);
+
+        tableHeader.getChildren().addAll(
+                headerIndex,
+                new Label("   "), // Space for cover image
+                headerTitle,
+                headerSpacer1,
+                headerAlbum,
+                headerSpacer2,
+                headerDate,
+                headerDuration
+        );
+
+        // Create songs list
+        VBox songsList = new VBox();
+        songsList.setStyle("-fx-background-color: transparent;");
+
+        if (songs.isEmpty()) {
+            Label noSongsLabel = new Label("No songs available");
+            noSongsLabel.setTextFill(Color.web("#b3b3b3"));
+            noSongsLabel.setFont(Font.font("System", FontWeight.NORMAL, 16));
+            noSongsLabel.setStyle("-fx-padding: 20;");
+            songsList.getChildren().add(noSongsLabel);
+        } else {
+            // Display all songs in list format
+            for (int i = 0; i < songs.size(); i++) {
+                HBox songRow = createSongRow(songs.get(i), i + 1);
+                songsList.getChildren().add(songRow);
+            }
         }
 
-        ScrollPane playlistScroll = new ScrollPane(playlistsRow);
-        playlistScroll.setFitToHeight(true);
-        playlistScroll.setFitToWidth(true);
-        playlistScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        playlistScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        playlistScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        ScrollPane songsScroll = new ScrollPane(songsList);
+        songsScroll.setFitToWidth(true);
+        songsScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        songsScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        songsScroll.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
 
-        centerContent.getChildren().addAll(welcomeLabel, playlistsLabel, playlistScroll);
+        // Container for table header and songs list
+        VBox songsTable = new VBox();
+        songsTable.getChildren().addAll(tableHeader, songsScroll);
+
+        centerContent.getChildren().addAll(welcomeLabel, songsLabel, songsTable);
 
         // === Bottom Bar ===
         HBox bottomBar = new HBox();
-        bottomBar.setStyle("-fx-background-color: #121212;");
-        bottomBar.setPadding(new Insets(20));
+        bottomBar.setStyle("-fx-background-color: #181818;");
+        bottomBar.setPadding(new Insets(15));
         bottomBar.setAlignment(Pos.CENTER);
 
-        Label nowPlaying = new Label("Now Playing: Song Name");
-        nowPlaying.setTextFill(Color.WHITE);
+        Label nowPlaying = new Label("♪ Ready to play your music");
+        nowPlaying.setTextFill(Color.web("#b3b3b3"));
+        nowPlaying.setFont(Font.font("System", FontWeight.NORMAL, 14));
         bottomBar.getChildren().add(nowPlaying);
 
         // === Layout Placement ===
@@ -213,7 +569,7 @@ public class Homepage
         // === Toggle on icon click using lambda ===
         settingsicon.setOnMouseClicked(e -> toggleSettingsMenu());
 
-        Scene scene = new Scene(root, 1000, 600);
+        Scene scene = new Scene(root, 1200, 700);
         stage.setScene(scene);
 
         // Handle missing CSS file gracefully

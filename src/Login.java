@@ -14,7 +14,8 @@ import java.sql.*;
 import java.time.LocalDate;
 import java.util.UUID;
 
-public class Login {
+public class Login
+{
     private Stage stage;
     private String loggedInUsername;
     private String loggedInEmail;
