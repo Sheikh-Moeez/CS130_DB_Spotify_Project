@@ -341,7 +341,7 @@ public class Login {
         return loginCard;
     }
 
-    // Getters for user information
+    // Getters for user informationf
     public String getLoggedInUsername() {
         return loggedInUsername;
     }
